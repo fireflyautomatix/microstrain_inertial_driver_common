@@ -71,7 +71,7 @@ public:
 TEST_F(TestMicrostrainParser, IgnoreAuxMipMessage)
 {
     // This is a real data capture from a GQ7 aux port
-    const std::string aux_string = "$GPGGA,223821.50,4044.62613,N,11158.82446,W,4,28,0.5,1295.7,M,18.8,M,,*44\r\nue\223441A 024 313 300\0\0\0\0\b261\0\0\0\0\0\0>\201\006%>\266\310\264\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
+    const std::string aux_string = "$GPGGA,223821.50,4044.62613,N,11158.82446,W,4,28,0.5,1295.7,M,18.8,M,,*44\r\nue\223441A\024\313\300\0\0\0\0\b\261\0\0\0\0\0\0>\201\006%>\266\310\264\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
 
     EXPECT_CALL(parser_, publishNMEASentence(HasSubstr("GPGGA"))).Times(1);
     EXPECT_CALL(parser_, warn(HasSubstr("Malformed NMEA sentence"))).Times(0);
