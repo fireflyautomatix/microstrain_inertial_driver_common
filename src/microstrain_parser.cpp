@@ -118,11 +118,7 @@ void MicrostrainParser::parseAuxString(const std::string& aux_string)
     MICROSTRAIN_DEBUG(node_, "Found NMEA sentence %s", nmea_sentence.c_str());
 
     // Publish the NMEA sentence to ROS
-    publishers_->nmea_sentence_msg_.header.stamp = ros_time_now(node_);
-    publishers_->nmea_sentence_msg_.header.frame_id = config_->nmea_frame_id_;
-    publishers_->nmea_sentence_msg_.sentence = nmea_sentence;
-    if (publishers_->nmea_sentence_pub_ != nullptr)
-      publishers_->nmea_sentence_pub_->publish(publishers_->nmea_sentence_msg_);
+    publishNMEASentence(nmea_sentence);
 
     // Remove everything from the beginning of the string to the end of the NMEA sentence as it should all be parsed now
     aux_string_.erase(0, nmea_end_index + 1);
@@ -1416,6 +1412,15 @@ void MicrostrainParser::printPacketStats()
                                  imu_timeout_packet_count_ + imu_checksum_error_packet_count_);
     }
   }
+}
+
+void MicrostrainParser::publishNMEASentence(const std::string& nmea_sentence)
+{
+  publishers_->nmea_sentence_msg_.header.stamp = ros_time_now(node_);
+  publishers_->nmea_sentence_msg_.header.frame_id = config_->nmea_frame_id_;
+  publishers_->nmea_sentence_msg_.sentence = nmea_sentence;
+  if (publishers_->nmea_sentence_pub_ != nullptr)
+    publishers_->nmea_sentence_pub_->publish(publishers_->nmea_sentence_msg_);
 }
 
 }  // namespace microstrain

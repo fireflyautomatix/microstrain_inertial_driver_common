@@ -55,6 +55,13 @@ public:
    */
   void parseAuxString(const std::string& aux_string);
 
+protected:
+  /**
+   * \brief Publish NMEA sentence
+   * \param nmea_sentence NMEA sentence to publish
+   */
+  virtual void publishNMEASentence(const std::string& nmea_sentence);
+
 private:
   /**
    * \brief Gets the packet timestamp from a MIP packet depending on whether we want to use the collected timestamp or device timestamp
