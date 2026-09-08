@@ -2169,9 +2169,15 @@ void Publishers::updateHeaderTime(RosHeaderType* header, uint8_t descriptor_set,
   else if (config_->timestamp_source_ == TIMESTAMP_SOURCE_HYBRID)
   {
     double utc_timestamp = 0;
-    if (clock_bias_monitor_.hasBiasEstimate())
+    const double gps_timestamp_secs = gpsTimestampSecs(gps_timestamp_copy);
+
+    // NOTE: valid_flags.timeValid() is a MASK (TIME_VALID == 0x0003), not a bool -- it is
+    // non-zero when only ONE of TOW/week number is set. Check both bits explicitly.
+    const bool gps_time_valid = gps_timestamp_copy.valid_flags.tow() && gps_timestamp_copy.valid_flags.weekNumber();
+
+    if (gps_time_valid && gps_timestamp_secs != 0 && clock_bias_monitor_.hasBiasEstimate())
     {
-      const double current_utc_timestamp = gpsTimestampSecs(gps_timestamp_copy) - clock_bias_monitor_.getBiasEstimate();
+      const double current_utc_timestamp = gps_timestamp_secs - clock_bias_monitor_.getBiasEstimate();
       const double previous_utc_timestamp = previous_utc_timestamps_.find(descriptor_set) != previous_utc_timestamps_.end() ? previous_utc_timestamps_.at(descriptor_set) : 0;
       const double utc_timestamp_dt = current_utc_timestamp - previous_utc_timestamp;
       if (utc_timestamp_dt >= 0)
@@ -2181,8 +2187,19 @@ void Publishers::updateHeaderTime(RosHeaderType* header, uint8_t descriptor_set,
       if (current_utc_timestamp != previous_utc_timestamp)
         previous_utc_timestamps_[descriptor_set] = current_utc_timestamp;
     }
+
+    // If we were not able to compute the hybrid timestamp, default to the ROS timestamp
     if (utc_timestamp == 0)
       utc_timestamp = static_cast<double>(timestamp) / 1000.0;
+
+    // ROS Time::sec is int32. An out-of-range double->int32 conversion is undefined
+    // behaviour; on x86 it yields INT32_MIN and silently poisons the header.
+    if (!(utc_timestamp > 0.0 && utc_timestamp < 2147483647.0))
+    {
+      MICROSTRAIN_WARN_THROTTLE(node_, 5, "Hybrid timestamp %.3f for descriptor set 0x%02x is out of range for a ROS time; falling back to arrival time", utc_timestamp, descriptor_set);
+      utc_timestamp = static_cast<double>(timestamp) / 1000.0;
+    }
+
     double utc_timestamp_seconds;
     const double utc_timestamp_subseconds = modf(utc_timestamp, &utc_timestamp_seconds);
     setRosTime(&header->stamp, static_cast<int32_t>(utc_timestamp_seconds), static_cast<int32_t>(utc_timestamp_subseconds * 1000000000));
