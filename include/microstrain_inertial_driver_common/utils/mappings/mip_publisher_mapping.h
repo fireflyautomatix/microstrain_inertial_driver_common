@@ -45,6 +45,18 @@ static constexpr auto GNSS2_VELOCITY_ECEF_TOPIC = "gnss_2/velocity_ecef";
 static constexpr auto GNSS2_ODOMETRY_TOPIC = "gnss_2/odometry_earth";
 static constexpr auto GNSS2_TIME_REF_TOPIC = "gnss_2/time";
 
+static constexpr auto GNSS4_FIX_TOPIC = "gnss_4/llh_position";
+static constexpr auto GNSS4_VELOCITY_TOPIC = "gnss_4/velocity";
+static constexpr auto GNSS4_VELOCITY_ECEF_TOPIC = "gnss_4/velocity_ecef";
+static constexpr auto GNSS4_ODOMETRY_TOPIC = "gnss_4/odometry_earth";
+static constexpr auto GNSS4_TIME_REF_TOPIC = "gnss_4/time";
+
+static constexpr auto GNSS5_FIX_TOPIC = "gnss_5/llh_position";
+static constexpr auto GNSS5_VELOCITY_TOPIC = "gnss_5/velocity";
+static constexpr auto GNSS5_VELOCITY_ECEF_TOPIC = "gnss_5/velocity_ecef";
+static constexpr auto GNSS5_ODOMETRY_TOPIC = "gnss_5/odometry_earth";
+static constexpr auto GNSS5_TIME_REF_TOPIC = "gnss_5/time";
+
 static constexpr auto FILTER_HUMAN_READABLE_STATUS_TOPIC = "ekf/status";
 static constexpr auto FILTER_IMU_DATA_TOPIC = "ekf/imu/data";
 static constexpr auto FILTER_LLH_POSITION_TOPIC = "ekf/llh_position";
@@ -65,6 +77,12 @@ static constexpr auto MIP_GNSS2_FIX_INFO_TOPIC = "mip/gnss_2/fix_info";
 static constexpr auto MIP_GNSS2_SBAS_INFO_TOPIC = "mip/gnss_2/sbas_info";
 static constexpr auto MIP_GNSS2_RF_ERROR_DETECTION_TOPIC = "mip/gnss_2/rf_error_detection";
 
+static constexpr auto MIP_GNSS4_FIX_INFO_TOPIC = "mip/gnss_4/fix_info";
+static constexpr auto MIP_GNSS4_RF_ERROR_DETECTION_TOPIC = "mip/gnss_4/rf_error_detection";
+
+static constexpr auto MIP_GNSS5_FIX_INFO_TOPIC = "mip/gnss_5/fix_info";
+static constexpr auto MIP_GNSS5_RF_ERROR_DETECTION_TOPIC = "mip/gnss_5/rf_error_detection";
+
 static constexpr auto MIP_GNSS_CORRECTIONS_RTK_CORRECTIONS_STATUS_TOPIC = "mip/gnss_corrections/rtk_corrections_status";
 
 static constexpr auto MIP_FILTER_STATUS_TOPIC = "mip/ekf/status";
@@ -77,6 +95,8 @@ static constexpr auto MIP_SYSTEM_BUILT_IN_TEST_TOPIC = "mip/system/built_in_test
 static constexpr auto MIP_SYSTEM_TIME_SYNC_STATUS_TOPIC = "mip/system/time_sync_status";
 
 static constexpr auto NMEA_SENTENCE_TOPIC = "nmea";
+
+static constexpr auto DEBUG_CLOCK_BIAS_TOPIC = "debug/clock_bias";
 
 // Some other constants
 static constexpr float FIELD_DATA_RATE_USE_DATA_CLASS = -1;

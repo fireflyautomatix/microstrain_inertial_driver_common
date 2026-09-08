@@ -38,7 +38,10 @@ constexpr auto GPS_LEAP_SECONDS = 18;
 
 constexpr auto GNSS1_ID = 0;
 constexpr auto GNSS2_ID = 1;
-constexpr auto NUM_GNSS = 2;
+constexpr auto GNSS4_ID = 2;
+constexpr auto GNSS5_ID = 3;
+
+constexpr auto NUM_GNSS = 4;
 };  // namespace microstrain
 
 /**
@@ -101,6 +104,8 @@ constexpr auto NUM_GNSS = 2;
 #include "microstrain_inertial_msgs/Mip3dmCaptureGyroBias.h"
 #include "microstrain_inertial_msgs/Mip3dmGpioStateRead.h"
 #include "microstrain_inertial_msgs/Mip3dmGpioStateWrite.h"
+
+#include "microstrain_inertial_msgs/MipGnssReceiverReset.h"
 
 /**
  * ROS2 Includes
@@ -173,6 +178,8 @@ constexpr auto NUM_GNSS = 2;
 #include "microstrain_inertial_msgs/srv/mip3dm_capture_gyro_bias.hpp"
 #include "microstrain_inertial_msgs/srv/mip3dm_gpio_state_read.hpp"
 #include "microstrain_inertial_msgs/srv/mip3dm_gpio_state_write.hpp"
+
+#include "microstrain_inertial_msgs/srv/mip_gnss_receiver_reset.hpp"
 #else
 #error "Unsupported ROS version. -DMICROSTRAIN_ROS_VERSION must be set to 1 or 2"
 #endif
@@ -299,6 +306,8 @@ using MipBaseGetDeviceInformationSrv = ::microstrain_inertial_msgs::MipBaseGetDe
 using Mip3dmCaptureGyroBiasSrv = ::microstrain_inertial_msgs::Mip3dmCaptureGyroBias;
 using Mip3dmGpioStateReadSrv = microstrain_inertial_msgs::Mip3dmGpioStateRead;
 using Mip3dmGpioStateWriteSrv = microstrain_inertial_msgs::Mip3dmGpioStateWrite;
+
+using MipGnssReceiverResetSrv = microstrain_inertial_msgs::MipGnssReceiverReset;
 
 // ROS1 aliases not intended to be used outside this file
 using ParamIntVector = std::vector<int32_t>;
@@ -621,6 +630,8 @@ using Mip3dmCaptureGyroBiasSrv = microstrain_inertial_msgs::srv::Mip3dmCaptureGy
 using Mip3dmGpioStateReadSrv = microstrain_inertial_msgs::srv::Mip3dmGpioStateRead;
 using Mip3dmGpioStateWriteSrv = microstrain_inertial_msgs::srv::Mip3dmGpioStateWrite;
 
+using MipGnssReceiverResetSrv = microstrain_inertial_msgs::srv::MipGnssReceiverReset;
+
 // ROS2 aliases not intended to be used outside this file
 using ParamIntVector = std::vector<int64_t>;
 
@@ -867,7 +878,12 @@ template <class ClassType>
 RosTimerType createTimer(RosNodeType* node, double hz, void (ClassType::*fp)(), ClassType* obj)
 {
   std::chrono::microseconds timer_interval_us(static_cast<int>(1.0 / hz * 1000000.0));
-  return node->template create_wall_timer(timer_interval_us, [=]() { (obj->*fp)(); });
+  return rclcpp::create_timer(
+    node,
+    std::make_shared<rclcpp::Clock>(RCL_STEADY_TIME),
+    timer_interval_us,
+    [=]() { (obj->*fp)(); }
+  );
 }
 
 /**

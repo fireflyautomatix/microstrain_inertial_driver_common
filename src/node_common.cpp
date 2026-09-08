@@ -45,7 +45,7 @@ void logCallbackProxy(void* user, microstrain_log_level level, const char* fmt, 
 void NodeCommon::parseAndPublishMain()
 {
   // This should receive all packets, populate ROS messages and publish them as well
-  if (!config_.mip_device_->device().update())
+  if (!config_.mip_device_->device().update(10))
   {
     MICROSTRAIN_ERROR(node_, "Unable to update device");
 
@@ -110,7 +110,7 @@ void NodeCommon::parseAndPublishMain()
 void NodeCommon::parseAndPublishAux()
 {
   // This should receive all packets and populate NMEA messages
-  config_.aux_device_->device().update();
+  config_.aux_device_->device().update(10);
 
   // Publish the NMEA messages
   const auto connection = config_.aux_device_->connection();
@@ -190,7 +190,9 @@ bool NodeCommon::configure(RosNodeType* config_node)
   }
 
   // Determine loop rate as 2*(max update rate), but abs. max of 1kHz
-  const int max_rate = std::max({config_.nmea_max_rate_hz_, config_.mip_publisher_mapping_->getMaxDataRate()});
+  int max_rate = std::max({config_.nmea_max_rate_hz_, config_.mip_publisher_mapping_->getMaxDataRate()});
+  if (config_.raw_file_include_support_data_)
+    max_rate = 1000;  // If streaming factory support data, data will be streaming too fast to loop any slower than 2000 hertz
   timer_update_rate_hz_ = std::min(2 * max_rate, 2000);
   if (timer_update_rate_hz_ <= 100)
     timer_update_rate_hz_ = 100.0;
