@@ -8,6 +8,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <chrono>
 #include <thread>
 #include <string>
 #include <iomanip>
@@ -41,6 +42,9 @@ void logCallbackProxy(void* user, microstrain_log_level level, const char* fmt, 
     reinterpret_cast<NodeCommon*>(user)->logCallback(level, "MIP SDK: " + log_str);
   }
 }
+
+// Longest time one timer tick may spend reading data that is already waiting on a port
+static constexpr std::chrono::milliseconds MAX_DRAIN_TIME(5);
 
 void NodeCommon::parseAndPublishMain()
 {
@@ -87,8 +91,13 @@ void NodeCommon::parseAndPublishMain()
     }
   }
 
-  // Publish the NMEA messages
+  // Each update reads at most one small chunk, so keep reading while data is already waiting.
+  // Otherwise a backlog after any delay takes many timer ticks to clear
   const auto connection = config_.mip_device_->connection();
+  if (connection != nullptr)
+    drainDevice(&config_.mip_device_->device(), *connection, MAX_DRAIN_TIME);
+
+  // Publish the NMEA messages
   if (connection != nullptr)
   {
     if (connection->shouldParseNmea())
@@ -111,9 +120,11 @@ void NodeCommon::parseAndPublishAux()
 {
   // This should receive all packets and populate NMEA messages
   config_.aux_device_->device().update(10);
+  const auto connection = config_.aux_device_->connection();
+  if (connection != nullptr)
+    drainDevice(&config_.aux_device_->device(), *connection, MAX_DRAIN_TIME);
 
   // Publish the NMEA messages
-  const auto connection = config_.aux_device_->connection();
   if (connection != nullptr)
   {
     if (connection->shouldParseNmea())

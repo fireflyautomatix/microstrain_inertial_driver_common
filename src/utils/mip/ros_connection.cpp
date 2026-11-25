@@ -17,7 +17,6 @@
 #include <iomanip>
 
 #include "microstrain/connections/serial/serial_connection.hpp"
-#include "microstrain/connections/recording/recording_connection.hpp"
 
 #include "microstrain_inertial_driver_common/utils/mip/ros_connection.h"
 #include "microstrain_inertial_driver_common/utils/mip/ros_mip_device.h"
@@ -57,9 +56,7 @@ bool RosConnection::disconnect()
 
 bool RosConnection::connect(RosNodeType* config_node, const std::string& port, const int32_t baudrate)
 {
-  // Some convenient typedefs
   using SerialConnection = microstrain::connections::SerialConnection;
-  using RecordingSerialConnection = microstrain::connections::RecordingConnectionWrapper<SerialConnection>;
 
   // If we were asked to, poll the port until it exists
   bool poll_port;
@@ -97,11 +94,11 @@ bool RosConnection::connect(RosNodeType* config_node, const std::string& port, c
     }
   }
 
-  // If the raw file is enabled, use a different connection type
+  // Received data is recorded by recvFromDevice, so a plain serial connection is used whether or not we are recording
   try
   {
     MICROSTRAIN_INFO(node_, "Attempting to open serial port <%s> at <%d>", port.c_str(), baudrate);
-    connection_ = std::unique_ptr<RecordingSerialConnection>(new RecordingSerialConnection(&record_file_, nullptr, port, baudrate));
+    connection_ = std::unique_ptr<SerialConnection>(new SerialConnection(port, baudrate));
   }
   catch (const std::exception& e)
   {
@@ -203,8 +200,9 @@ std::string RosConnection::rawFilePath()
 
 bool RosConnection::updateRecordingState(const bool should_record, const std::string& record_file_path)
 {
-  // If we are already recording, we need to close the file, but keep that in mind in case we fail to update
-  const bool was_recording = record_file_.is_open();
+  // If we are already recording, we need to close the file, but keep that in mind in case we fail to update.
+  // Data already queued for the old file is still written to it before it is closed
+  const bool was_recording = record_file_.isOpen();
   if (was_recording)
   {
     MICROSTRAIN_INFO(node_, "Closing binary datafile at %s", record_file_path_.c_str());
@@ -214,14 +212,13 @@ bool RosConnection::updateRecordingState(const bool should_record, const std::st
   // Try to open the new file if we were requested to record
   if (should_record)
   {
-    record_file_.open(record_file_path, std::ios::out | std::ios::binary | std::ios::trunc);
-    if (!record_file_.is_open())
+    if (!record_file_.open(record_file_path, true))
     {
       MICROSTRAIN_ERROR(node_, "ERROR opening raw binary datafile at %s", record_file_path.c_str());
 
-      // If we failed to open the new file, open the old one but do not truncate it
+      // If we failed to open the new file, reopen the old one without discarding what it already holds
       if (was_recording)
-        record_file_.open(record_file_path_, std::ios::out | std::ios::binary);
+        record_file_.open(record_file_path_, false);
       return false;
     }
     else
@@ -247,8 +244,22 @@ bool RosConnection::sendToDevice(const uint8_t* data, size_t length)
 bool RosConnection::recvFromDevice(uint8_t* buffer, size_t max_length, unsigned int wait_time_ms, size_t* length_out, microstrain::EmbeddedTimestamp* timestamp_out)
 {
   const bool success = (connection_ != nullptr) ? connection_->recvFromDevice(buffer, max_length, wait_time_ms, length_out, timestamp_out) : false;
+  last_recv_length_ = success ? *length_out : 0;
   if (success)
   {
+    // Record the raw data. This only queues it, the disk is written from another thread
+    if (*length_out > 0)
+      record_file_.write(buffer, *length_out);
+
+    // Data can be lost if the disk falls far behind or a write fails, so report it
+    const uint64_t dropped_bytes = record_file_.droppedBytes();
+    if (dropped_bytes != reported_dropped_bytes_)
+    {
+      MICROSTRAIN_WARN_THROTTLE(node_, 5, "%lu bytes could not be written to the binary datafile at %s. The disk is not keeping up or writes are failing",
+                                static_cast<unsigned long>(dropped_bytes), record_file_path_.c_str());
+      reported_dropped_bytes_ = dropped_bytes;
+    }
+
     *timestamp_out = static_cast<microstrain::EmbeddedTimestamp>(getTimeRefSecs(rosTimeNow(node_)) * 1000.0);
 
     // Parse NMEA sentences if we were asked to
@@ -256,6 +267,11 @@ bool RosConnection::recvFromDevice(uint8_t* buffer, size_t max_length, unsigned 
       extractNmea(buffer, *length_out);
   }
   return success;
+}
+
+size_t RosConnection::lastRecvLength() const
+{
+  return last_recv_length_;
 }
 
 const char* RosConnection::interfaceName() const
@@ -366,6 +382,22 @@ void RosConnection::extractNmea(const uint8_t* data, size_t data_len)
     nmea_string_.erase(0, nmea_string_.size() - NMEA_MAX_LENGTH);
   }
   MICROSTRAIN_DEBUG(node_, "Cached NMEA string is %lu bytes after trimming", nmea_string_.size());
+}
+
+size_t drainDevice(mip::Interface* device, const RosConnection& connection, const std::chrono::milliseconds budget)
+{
+  const auto start = std::chrono::steady_clock::now();
+  size_t total_bytes = 0;
+  while (std::chrono::steady_clock::now() - start < budget)
+  {
+    if (!device->update(0))
+      break;  // The caller's next regular update will report the error
+    const size_t bytes = connection.lastRecvLength();
+    if (bytes == 0)
+      break;  // Nothing left waiting
+    total_bytes += bytes;
+  }
+  return total_bytes;
 }
 
 }  // namespace microstrain

@@ -15,12 +15,13 @@
 #include <vector>
 #include <string>
 #include <memory>
-#include <fstream>
+#include <chrono>
 
 #include "microstrain/connections/connection.hpp"
 #include "mip/mip_interface.hpp"
 
 #include "microstrain_inertial_driver_common/utils/ros_compat.h"
+#include "microstrain_inertial_driver_common/utils/async_file_writer.h"
 
 namespace microstrain
 {
@@ -125,6 +126,12 @@ class RosConnection : public microstrain::Connection
    */
   bool updateRecordingState(const bool should_record, const std::string& record_file_path);
 
+  /**
+   * \brief Gets the number of bytes returned by the most recent read from the device
+   * \return Bytes read by the last call to recvFromDevice, or 0 if it failed
+   */
+  size_t lastRecvLength() const;
+
   // Implemented in order to satisfy the requirements for the MIP connection
   bool sendToDevice(const uint8_t* data, size_t length) final;
   bool recvFromDevice(uint8_t* buffer, size_t max_length, unsigned int wait_time_ms, size_t* length_out, microstrain::EmbeddedTimestamp* timestamp_out) final;
@@ -147,12 +154,24 @@ class RosConnection : public microstrain::Connection
 
   bool should_record_ = false;  /// Whether or not we should record binary data on this connection
   std::string record_file_path_;  /// The path to where data will be recorded
-  std::ofstream record_file_;  /// The file that the binary data should be recorded to
+  AsyncFileWriter record_file_;  /// Writes the binary data on its own thread, so a slow disk can never stall reading the device
+  uint64_t reported_dropped_bytes_ = 0;  /// Dropped recording bytes that have already been warned about
+  size_t last_recv_length_ = 0;  /// Bytes returned by the most recent read from the device
 
   bool should_parse_nmea_ = false;  /// Whether or not we should attempt to parse and extract NMEA sentences on this connection
   std::string nmea_string_ = "";  /// Cached data read from the port, used to extraxt NMEA messages
   std::vector<NMEASentenceMsg> nmea_msgs_;  /// List of NMEA messages received by this connection
 };
+
+/**
+ * \brief Keeps reading and parsing data that is already waiting on the connection, so a backlog is cleared in one call
+ *        instead of one read per timer tick. Stops when a read returns no data, a read fails, or the time budget runs out
+ * \param device The MIP interface to update
+ * \param connection The connection the interface reads from
+ * \param budget Longest time to spend
+ * \return Number of bytes read
+ */
+size_t drainDevice(mip::Interface* device, const RosConnection& connection, std::chrono::milliseconds budget);
 
 }  // namespace microstrain
 

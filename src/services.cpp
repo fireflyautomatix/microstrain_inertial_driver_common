@@ -78,6 +78,9 @@ bool Services::rawFileConfigMainWrite(RawFileConfigWriteSrv::Request& req, RawFi
     return false;
 
   // Turn on factory support and aiding control if we are recording the binary. If not, we can't really turn them off, so just leave them on
+  // TODO: factory support data (~70 KB/s on a GQ7) keeps streaming after recording stops, until the driver restarts.
+  //       FactoryStreaming::Action only offers OVERWRITE, MERGE and ADD, and OVERWRITE would also remove the message
+  //       formats configured at startup. Turning it off needs the original formats re-applied, which needs hardware to verify
   if (req.enable)
   {
     // Enable factory support
